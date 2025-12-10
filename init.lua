@@ -169,7 +169,7 @@ end
 
 local last_wielded = {}
 local timer = 0
-local interval = 0.5
+local interval = 0.1
 
 core.register_globalstep(function(dtime)
     timer = timer + dtime
