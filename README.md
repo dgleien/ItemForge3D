@@ -19,7 +19,7 @@ itemforge3d.register(modname, name, def)
 You can register **three kinds of items**:
 
 1. **Tools** → `type = "tool"`  
-   - Pickaxes, swords, axes, etc.  
+   - Pickaxes, swords, axes, shields, etc.  
    - Registered with `core.register_tool`.
 
 2. **Nodes** → `type = "node"`  
@@ -27,7 +27,7 @@ You can register **three kinds of items**:
    - Registered with `core.register_node`.
 
 3. **Craftitems** → `type = "craftitem"`  
-   - Misc items (food, gems, scrolls).  
+   - Misc items (food, gems, scrolls, lanterns).  
    - Registered with `core.register_craftitem`.
 
 ---
@@ -43,7 +43,9 @@ Here’s what you can put inside `def`:
 | `inventory_image` | string  | Icon texture for inventory |
 | `recipe`          | table   | Shaped craft recipe (shorthand) |
 | `craft`           | table   | Full craft definition (shapeless, cooking, fuel, etc.) |
+| `slot`            | string  | Equipment slot (`helmet`, `chest`, `legs`, `boots`, `shield`, or custom) |
 | `attach_model`    | table   | Defines the 3D model to attach when wielded |
+| `stats`           | table   | Arbitrary stats (armor, speed, jump, gravity, knockback, or custom) |
 
 ---
 
@@ -87,6 +89,44 @@ end
 
 ---
 
+## Equipment Lifecycle
+
+The API manages **equip/unequip** automatically:
+
+- `itemforge3d.equip(player, itemname)` → equips an item into its slot.  
+- If a slot is already occupied, the old item is unequipped first.  
+- Entities are attached to player bones for visuals.  
+- On player **death** or **leave**, all equipment is removed.  
+
+### Callbacks
+- `itemforge3d.on_equip(player, def, slot)` → called when an item is equipped.  
+- `itemforge3d.on_unequip(player, def, slot)` → called when an item is unequipped.  
+
+---
+
+## Stats System
+
+- Stats from all equipped items are **aggregated** automatically.  
+- Use `itemforge3d.refresh_stats(player)` to recalculate.  
+- Use `itemforge3d.get_stats(player)` to retrieve cached stats.  
+
+> Stats are **not applied automatically** to gameplay — mods must use them (e.g. adjust physics, damage, etc.).
+
+---
+
+## API ARMOR
+
+| Function                        | Description |
+|---------------------------------|-------------|
+| `itemforge3d.equip(player, itemname)` | Equip an item by name |
+| `itemforge3d.get_stats(player)` | Get aggregated stats for a player |
+| `itemforge3d.refresh_stats(player)` | Force refresh of cached stats |
+| `itemforge3d.is_equipped(player, slot)` | (suggested helper) Check if a slot is filled |
+| `itemforge3d.get_equipped_item(player, slot)` | (suggested helper) Get the item definition in a slot |
+| `itemforge3d.unequip(player, slot)` | (suggested helper) Unequip an item from a slot |
+
+---
+
 ## Full Examples
 
 ### 1. Tool with 3D Model (shaped recipe shorthand)
@@ -111,7 +151,8 @@ itemforge3d.register("mymod", "sword", {
             position = {x=0, y=5, z=0},
             rotation = {x=0, y=90, z=0}
         }
-    }
+    },
+    stats = { damage = 5 }
 })
 ```
 
@@ -187,12 +228,68 @@ itemforge3d.register("mymod", "lantern", {
 
 ---
 
+### 4. Helmet with Armor Stat
+```lua
+itemforge3d.register("mymod", "iron_helmet", {
+    type = "craftitem",
+    description = "Iron Helmet",
+    inventory_image = "iron_helmet.png",
+    slot = "helmet",
+    stats = { armor = 2 },
+    attach_model = {
+        properties = { mesh = "helmet.glb", textures = {"iron_helmet.png"} },
+        attach = { bone = "Head", position = {x=0,y=0,z=0} }
+    }
+})
+```
+
+---
+
+### 5. Boots with Speed Bonus
+```lua
+itemforge3d.register("mymod", "swift_boots", {
+    type = "craftitem",
+    description = "Swift Boots",
+    inventory_image = "swift_boots.png",
+    slot = "boots",
+    stats = { speed = 0.3 },
+    attach_model = {
+        properties = { mesh = "boots.glb", textures = {"swift_boots.png"} },
+        attach = { bone = "Legs", position = {x=0,y=0,z=0} }
+
+    }
+})
+
+```
+### 6. Shield with Knockback Resistance
+```lua
+itemforge3d.register("mymod", "sturdy_shield", {
+    type = "tool",
+    description = "Sturdy Shield",
+    inventory_image = "shield.png",
+    slot = "shield",
+    stats = { knockback = -0.5 },
+    attach_model = {
+        properties = { mesh = "shield.glb", textures = {"shield.png"} },
+        attach = { bone = "Arm_Left", position = {x=0,y=5,z=0}, rotation = {x=0,y=0,z=0} }
+    }
+})
+```
+---
+
 ## Summary
 
 - Use `itemforge3d.register(modname, name, def)` for **tools, nodes, or craftitems**.  
+- Add `slot` to place items in equipment slots (`helmet`, `boots`, `shield`, etc.).  
 - Add `attach_model` to show a **3D mesh** when wielded.  
 - Use `update` for **animations, effects, or dynamic behavior**.  
 - Recipes can be declared either with `recipe` (shaped shorthand) or `craft` (full passthrough).  
-- Fallback: if no `attach_model`, the mod shows a default cube.  
+- Stats are arbitrary and aggregated by the API, but not applied automatically.  
+- Equipment is cleaned up on **death** or **leaveplayer**.  
 - Duplicate registrations log a warning.  
 - The registered item will be named `modname:name`.  
+- Optional callbacks `on_equip` and `on_unequip` let mods hook into lifecycle events.  
+- Helper functions (`equip`, `get_stats`, `refresh_stats`, etc.) make it easy to manage equipment programmatically.  
+
+---
+

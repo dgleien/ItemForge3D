@@ -1,16 +1,33 @@
+
 itemforge3d = {
-    defs = {},
-    last_wield = {},
-    player_entities = {},
-    step_accum = 0,
-    step_interval = 0.15,
+    defs = {},      
+    equipped = {},     
+    entities = {},   
+    cached_stats = {}, 
+    slots = { "shield", "helmet", "chest", "legs", "boots" },
+
+  
+    on_equip = nil, 
+    on_unequip = nil,   
 }
+
+local function is_valid_slot(slot)
+    for _, s in ipairs(itemforge3d.slots) do
+        if s == slot then return true end
+    end
+    return false
+end
+
 
 function itemforge3d.register(modname, name, def)
     local full_name = modname .. ":" .. name
 
     if itemforge3d.defs[full_name] then
         core.log("warning", "[itemforge3d] Duplicate registration for " .. full_name)
+    end
+
+    if def.slot and not is_valid_slot(def.slot) then
+        core.log("warning", "[itemforge3d] Unknown slot '" .. def.slot .. "' for " .. full_name)
     end
 
     if def.type == "tool" then
@@ -34,6 +51,7 @@ function itemforge3d.register(modname, name, def)
 
     itemforge3d.defs[full_name] = def
 end
+
 
 core.register_entity("itemforge3d:wield_entity", {
     initial_properties = {
@@ -70,53 +88,85 @@ local function attach_model(player, def)
         a.forced_visible or false
     )
 
-    itemforge3d.player_entities[pname] = ent
+    local slot = def.slot or "weapon"
+    itemforge3d.entities[pname] = itemforge3d.entities[pname] or {}
+    itemforge3d.entities[pname][slot] = ent
+
+    itemforge3d.equipped[pname] = itemforge3d.equipped[pname] or {}
+    itemforge3d.equipped[pname][slot] = def
+
+    itemforge3d.refresh_stats(player)
+
+    if itemforge3d.on_equip then
+        itemforge3d.on_equip(player, def, slot)
+    end
+end
+
+function itemforge3d.equip(player, itemname)
+    local pname = player:get_player_name()
+    local def = itemforge3d.defs[itemname]
+    if not def or not def.slot then return end
+
+    if itemforge3d.entities[pname] and itemforge3d.entities[pname][def.slot] then
+        local old_def = itemforge3d.equipped[pname][def.slot]
+        itemforge3d.entities[pname][def.slot]:remove()
+        itemforge3d.entities[pname][def.slot] = nil
+        itemforge3d.equipped[pname][def.slot] = nil
+
+        if itemforge3d.on_unequip and old_def then
+            itemforge3d.on_unequip(player, old_def, def.slot)
+        end
+    end
+
+    attach_model(player, def)
 end
 
 core.register_on_leaveplayer(function(player)
     local pname = player:get_player_name()
-    if itemforge3d.player_entities[pname] then
-        itemforge3d.player_entities[pname]:remove()
-        itemforge3d.player_entities[pname] = nil
+    if itemforge3d.entities[pname] then
+        for slot, ent in pairs(itemforge3d.entities[pname]) do
+            ent:remove()
+            if itemforge3d.on_unequip and itemforge3d.equipped[pname] and itemforge3d.equipped[pname][slot] then
+                itemforge3d.on_unequip(player, itemforge3d.equipped[pname][slot], slot)
+            end
+        end
+        itemforge3d.entities[pname] = nil
     end
-    itemforge3d.last_wield[pname] = nil
+    itemforge3d.equipped[pname] = nil
+    itemforge3d.cached_stats[pname] = nil
 end)
 
 core.register_on_dieplayer(function(player)
     local pname = player:get_player_name()
-    if itemforge3d.player_entities[pname] then
-        itemforge3d.player_entities[pname]:remove()
-        itemforge3d.player_entities[pname] = nil
-    end
-    itemforge3d.last_wield[pname] = nil
-end)
-
-core.register_globalstep(function(dtime)
-    itemforge3d.step_accum = itemforge3d.step_accum + dtime
-    if itemforge3d.step_accum < itemforge3d.step_interval then return end
-    itemforge3d.step_accum = 0
-
-    for _, player in ipairs(core.get_connected_players()) do
-        local pname = player:get_player_name()
-        local wield = player:get_wielded_item():get_name()
-        local def = itemforge3d.defs[wield] -- always defined
-
-        if itemforge3d.last_wield[pname] ~= wield then
-            itemforge3d.last_wield[pname] = wield
-
-            if itemforge3d.player_entities[pname] then
-                itemforge3d.player_entities[pname]:remove()
-                itemforge3d.player_entities[pname] = nil
-            end
-
-            if def then
-                attach_model(player, def)
+    if itemforge3d.entities[pname] then
+        for slot, ent in pairs(itemforge3d.entities[pname]) do
+            ent:remove()
+            if itemforge3d.on_unequip and itemforge3d.equipped[pname] and itemforge3d.equipped[pname][slot] then
+                itemforge3d.on_unequip(player, itemforge3d.equipped[pname][slot], slot)
             end
         end
+        itemforge3d.entities[pname] = nil
+    end
+    itemforge3d.equipped[pname] = nil
+    itemforge3d.cached_stats[pname] = nil
+end)
 
-        local ent = itemforge3d.player_entities[pname]
-        if ent and def and def.attach_model and def.attach_model.update then
-            def.attach_model.update(ent, player)
+function itemforge3d.refresh_stats(player)
+    local pname = player:get_player_name()
+    local stats = {}
+    if itemforge3d.equipped[pname] then
+        for slot, def in pairs(itemforge3d.equipped[pname]) do
+            if def.stats then
+                for k,v in pairs(def.stats) do
+                    stats[k] = (stats[k] or 0) + v
+                end
+            end
         end
     end
-end)
+    itemforge3d.cached_stats[pname] = stats
+end
+
+function itemforge3d.get_stats(player)
+    local pname = player:get_player_name()
+    return itemforge3d.cached_stats[pname] or {}
+end
