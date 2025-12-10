@@ -170,7 +170,6 @@ end
 local last_wielded = {}
 local timer = 0
 local interval = 0.1
-
 core.register_globalstep(function(dtime)
     timer = timer + dtime
     if timer < interval then return end
@@ -180,16 +179,22 @@ core.register_globalstep(function(dtime)
         local pname = player:get_player_name()
         local wielded = player:get_wielded_item():get_name()
 
-        if wielded ~= "" and wielded ~= last_wielded[pname] then
+        if wielded ~= last_wielded[pname] then
             last_wielded[pname] = wielded
             local def = itemforge3d.defs[wielded]
+
             if def and def.auto_wield then
                 itemforge3d.equip(player, wielded)
+            else
+                for slot, equipped in pairs(itemforge3d.equipped[pname] or {}) do
+                    if equipped and equipped.auto_wield then
+                        itemforge3d.unequip(player, slot)
+                    end
+                end
             end
         end
     end
 end)
-
 core.register_on_leaveplayer(function(player)
     local pname = player:get_player_name()
     last_wielded[pname] = nil
