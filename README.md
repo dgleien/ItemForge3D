@@ -44,9 +44,9 @@ Here’s what you can put inside `def`:
 | `recipe`          | table   | Shaped craft recipe (shorthand) |
 | `craft`           | table   | Full craft definition (shapeless, cooking, fuel, etc.) |
 | `slot`            | string  | Equipment slot (`helmet`, `chest`, `legs`, `boots`, `shield`, or custom) |
-| `attach_model`    | table   | Defines the 3D model to attach when wielded |
+| `attach_model`    | table   | Defines the 3D model to attach when equipped |
 | `stats`           | table   | Arbitrary stats (armor, speed, jump, gravity, knockback, or custom) |
-| `auto_wield`      | boolean | If `true`, the item auto‑attaches when wielded in the hotbar |
+| `auto_wield`      | boolean | If `true`, the item auto‑attaches when wielded (optional, now handled externally) |
 
 ---
 
@@ -98,7 +98,6 @@ The API manages **equip/unequip** automatically:
 - If a slot is already occupied, the old item is unequipped first.  
 - Entities are attached to player bones for visuals.  
 - On player **death** or **leave**, all equipment is removed.  
-- Items with `auto_wield = true` are automatically equipped when wielded in the hotbar (checked every 0.1s by default).  
 
 ### Callbacks
 - `itemforge3d.on_equip(player, def, slot)` → called when an item is equipped.  
@@ -127,7 +126,6 @@ The API manages **equip/unequip** automatically:
 | `itemforge3d.get_equipped_item(player, slot)` | Get the item definition in a slot |
 | `itemforge3d.unequip(player, slot)` | Unequip an item from a slot |
 
----
 
 ## Full Examples
 
@@ -322,7 +320,7 @@ itemforge3d.register("mymod", "spring_leggings", {
 
 - Use `itemforge3d.register(modname, name, def)` for **tools, nodes, or craftitems**.  
 - Add `slot` to place items in equipment slots (`helmet`, `boots`, `shield`, `chest`, `legs`, etc.).  
-- Add `attach_model` to show a **3D mesh** when wielded.  
+- Add `attach_model` to show a **3D mesh** when equipped.  
 - Use `update` for **animations, effects, or dynamic behavior**.  
 - Recipes can be declared either with `recipe` (shaped shorthand) or `craft` (full passthrough).  
 - Stats are arbitrary and aggregated by the API, but not applied automatically.  
@@ -331,4 +329,6 @@ itemforge3d.register("mymod", "spring_leggings", {
 - The registered item will be named `modname:name`.  
 - Optional callbacks `on_equip` and `on_unequip` let mods hook into lifecycle events.  
 - Helper functions (`equip`, `get_stats`, `refresh_stats`, `is_equipped`, `get_equipped_item`, `unequip`) make it easy to manage equipment programmatically.  
-- Items can opt‑in to **auto‑attach on wield** by setting `auto_wield = true`.  
+- Items can opt‑in to **auto‑attach on wield** by setting `auto_wield = true`, but this is now handled externally (e.g. via a formspec mod).  
+
+
