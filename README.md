@@ -6,9 +6,9 @@ Use the function:
 itemforge3d.register(modname, name, def)
 ```
 
-- `modname`: The mod's namespace (e.g. `"mymod"`).
-- `name`: The item’s unique name (e.g. `"sword"`).
-- `def`: A table with item definition and optional 3D model info.
+- `modname`: The mod's namespace (e.g. `"mymod"`).  
+- `name`: The item’s unique name (e.g. `"sword"`).  
+- `def`: A table with item definition and optional 3D model info.  
 
 > The final registered item will be named as `modname:name`, for example: `"mymod:sword"`.
 
@@ -18,16 +18,16 @@ itemforge3d.register(modname, name, def)
 
 You can register **three kinds of items**:
 
-1. **Tools** → `type = "tool"`
-   - Pickaxes, swords, axes, etc.
+1. **Tools** → `type = "tool"`  
+   - Pickaxes, swords, axes, etc.  
    - Registered with `core.register_tool`.
 
-2. **Nodes** → `type = "node"`
-   - Blocks you can place in the world.
+2. **Nodes** → `type = "node"`  
+   - Blocks you can place in the world.  
    - Registered with `core.register_node`.
 
-3. **Craftitems** → `type = "craftitem"`
-   - Misc items (food, gems, scrolls).
+3. **Craftitems** → `type = "craftitem"`  
+   - Misc items (food, gems, scrolls).  
    - Registered with `core.register_craftitem`.
 
 ---
@@ -36,13 +36,14 @@ You can register **three kinds of items**:
 
 Here’s what you can put inside `def`:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `type` | string | `"tool"`, `"node"`, or `"craftitem"` |
-| `description` | string | Text shown in inventory |
-| `inventory_image` | string | Icon texture for inventory |
-| `recipe` | table | Craft recipe (optional) |
-| `attach_model` | table | Defines the 3D model to attach when wielded |
+| Field             | Type    | Description |
+|-------------------|---------|-------------|
+| `type`            | string  | `"tool"`, `"node"`, or `"craftitem"` |
+| `description`     | string  | Text shown in inventory |
+| `inventory_image` | string  | Icon texture for inventory |
+| `recipe`          | table   | Shaped craft recipe (shorthand) |
+| `craft`           | table   | Full craft definition (shapeless, cooking, fuel, etc.) |
+| `attach_model`    | table   | Defines the 3D model to attach when wielded |
 
 ---
 
@@ -50,11 +51,11 @@ Here’s what you can put inside `def`:
 
 Inside `attach_model`, you can define:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `properties` | table | Entity properties (mesh, textures, size) |
-| `attach` | table | Where/how to attach to player |
-| `update` | function | Optional per-frame logic (animations, effects) |
+| Field        | Type     | Description |
+|--------------|----------|-------------|
+| `properties` | table    | Entity properties (mesh, textures, size) |
+| `attach`     | table    | Where/how to attach to player |
+| `update`     | function | Optional per-frame logic (animations, effects) |
 
 ### Example `properties`
 ```lua
@@ -88,7 +89,7 @@ end
 
 ## Full Examples
 
-### 1. Tool with 3D Model
+### 1. Tool with 3D Model (shaped recipe shorthand)
 ```lua
 itemforge3d.register("mymod", "sword", {
     type = "tool",
@@ -116,16 +117,19 @@ itemforge3d.register("mymod", "sword", {
 
 ---
 
-### 2. Node with 3D Model
+### 2. Node with 3D Model (full craft passthrough)
 ```lua
 itemforge3d.register("mymod", "magic_block", {
     type = "node",
     description = "Magic Block",
     inventory_image = "magic_block.png",
-    recipe = {
-        {"default:mese_crystal", "default:mese_crystal", "default:mese_crystal"},
-        {"default:mese_crystal", "default:diamond", "default:mese_crystal"},
-        {"default:mese_crystal", "default:mese_crystal", "default:mese_crystal"}
+    craft = {
+        output = "mymod:magic_block",
+        recipe = {
+            {"default:mese_crystal", "default:mese_crystal", "default:mese_crystal"},
+            {"default:mese_crystal", "default:diamond", "default:mese_crystal"},
+            {"default:mese_crystal", "default:mese_crystal", "default:mese_crystal"}
+        }
     },
     attach_model = {
         properties = {
@@ -185,11 +189,10 @@ itemforge3d.register("mymod", "lantern", {
 
 ## Summary
 
-- Use `itemforge3d.register(modname, name, def)` for **tools, nodes, or craftitems**.
-- Add `attach_model` to show a **3D mesh** when wielded.
-- Use `update` for **animations, effects, or dynamic behavior**.
-- Recipes are optional but supported.
-- Fallback: if no `attach_model`, the mod shows a default cube.
-- The registered item will be named `modname:name`.
-
---- 
+- Use `itemforge3d.register(modname, name, def)` for **tools, nodes, or craftitems**.  
+- Add `attach_model` to show a **3D mesh** when wielded.  
+- Use `update` for **animations, effects, or dynamic behavior**.  
+- Recipes can be declared either with `recipe` (shaped shorthand) or `craft` (full passthrough).  
+- Fallback: if no `attach_model`, the mod shows a default cube.  
+- Duplicate registrations log a warning.  
+- The registered item will be named `modname:name`.  
