@@ -1,4 +1,4 @@
-
+```lua
 itemforge3d = {
     defs = {},      
     equipped = {},     
@@ -6,7 +6,6 @@ itemforge3d = {
     cached_stats = {}, 
     slots = { "shield", "helmet", "chest", "legs", "boots" },
 
-  
     on_equip = nil, 
     on_unequip = nil,   
 }
@@ -14,10 +13,9 @@ itemforge3d = {
 local function is_valid_slot(slot)
     for _, s in ipairs(itemforge3d.slots) do
         if s == slot then return true end
+        return false
     end
-    return false
 end
-
 
 function itemforge3d.register(modname, name, def)
     local full_name = modname .. ":" .. name
@@ -51,7 +49,6 @@ function itemforge3d.register(modname, name, def)
 
     itemforge3d.defs[full_name] = def
 end
-
 
 core.register_entity("itemforge3d:wield_entity", {
     initial_properties = {
@@ -169,4 +166,61 @@ end
 function itemforge3d.get_stats(player)
     local pname = player:get_player_name()
     return itemforge3d.cached_stats[pname] or {}
+end
+
+local last_wielded = {}
+local timer = 0
+local interval = 0.5
+
+core.register_globalstep(function(dtime)
+    timer = timer + dtime
+    if timer < interval then return end
+    timer = 0
+
+    for _, player in ipairs(core.get_connected_players()) do
+        local pname = player:get_player_name()
+        local wielded = player:get_wielded_item():get_name()
+
+        if wielded ~= "" and wielded ~= last_wielded[pname] then
+            last_wielded[pname] = wielded
+            local def = itemforge3d.defs[wielded]
+            if def and def.auto_wield then
+                itemforge3d.equip(player, wielded)
+            end
+        end
+    end
+end)
+
+core.register_on_leaveplayer(function(player)
+    local pname = player:get_player_name()
+    last_wielded[pname] = nil
+end)
+
+function itemforge3d.is_equipped(player, slot)
+    local pname = player:get_player_name()
+    return itemforge3d.equipped[pname] and itemforge3d.equipped[pname][slot] ~= nil
+end
+
+function itemforge3d.get_equipped_item(player, slot)
+    local pname = player:get_player_name()
+    if itemforge3d.equipped[pname] then
+        return itemforge3d.equipped[pname][slot]
+    end
+    return nil
+end
+
+function itemforge3d.unequip(player, slot)
+    local pname = player:get_player_name()
+    if itemforge3d.entities[pname] and itemforge3d.entities[pname][slot] then
+        local old_def = itemforge3d.equipped[pname][slot]
+        itemforge3d.entities[pname][slot]:remove()
+        itemforge3d.entities[pname][slot] = nil
+        itemforge3d.equipped[pname][slot] = nil
+
+        if itemforge3d.on_unequip and old_def then
+            itemforge3d.on_unequip(player, old_def, slot)
+        end
+
+        itemforge3d.refresh_stats(player)
+    end
 end
