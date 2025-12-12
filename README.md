@@ -1,3 +1,9 @@
+# ItemForge3D – 3D Equipment System for Minetest
+
+ItemForge3D is a powerful modding API that allows you to register **tools, nodes, and craftitems** with **3D models**, attach them to players, and manage **equipment slots** and **stats**.
+
+---
+
 ## How to Register Items
 
 Use the function:
@@ -43,9 +49,11 @@ Here’s what you can put inside `def`:
 | `inventory_image` | string  | Icon texture for inventory |
 | `recipe`          | table   | Shaped craft recipe (shorthand) |
 | `craft`           | table   | Full craft definition (shapeless, cooking, fuel, etc.) |
-| `slot`            | string  | Equipment slot (`helmet`, `chest`, `legs`, `boots`, `shield`, or custom) |
+| `slot`            | string  | Equipment slot (`helmet`, `chest`, `legs`, `boots`, `shield`) |
 | `attach_model`    | table   | Defines the 3D model to attach when equipped |
 | `stats`           | table   | Arbitrary stats (armor, speed, jump, gravity, knockback, or custom) |
+| `on_equip`        | function| Called when item is equipped |
+| `on_unequip`      | function| Called when item is unequipped |
 
 ---
 
@@ -93,38 +101,39 @@ end
 
 The API manages **equip/unequip** automatically:
 
-- `itemforge3d.equip(player, itemname)` → equips an item into its slot.  
+- `itemforge3d.equip(player, def)` → equips an item into its slot.  
 - If a slot is already occupied, the old item is unequipped first.  
 - Entities are attached to player bones for visuals.  
 - On player **death** or **leave**, all equipment is removed.  
 
 ### Callbacks
-- `itemforge3d.on_equip(player, def, slot)` → called when an item is equipped.  
-- `itemforge3d.on_unequip(player, def, slot)` → called when an item is unequipped.  
+- `on_equip(player, ent, slot, def)` → called when an item is equipped.  
+- `on_unequip(player, slot, def)` → called when an item is unequipped.  
 
 ---
 
 ## Stats System
 
 - Stats from all equipped items are **aggregated** automatically.  
-- Use `itemforge3d.refresh_stats(player)` to recalculate.  
-- Use `itemforge3d.get_stats(player)` to retrieve cached stats.  
+- Use `itemforge3d.get_stats(player)` to retrieve aggregated stats.  
 
 > Stats are **not applied automatically** to gameplay — mods must use them (e.g. adjust physics, damage, etc.).
 
 ---
 
-## API ARMOR
+## API Reference
 
-| Function                        | Description |
-|---------------------------------|-------------|
-| `itemforge3d.equip(player, itemname)` | Equip an item by name |
-| `itemforge3d.get_stats(player)` | Get aggregated stats for a player |
-| `itemforge3d.refresh_stats(player)` | Force refresh of cached stats |
-| `itemforge3d.is_equipped(player, slot)` | Check if a slot is filled |
-| `itemforge3d.get_equipped_item(player, slot)` | Get the item definition in a slot |
+| Function                          | Description |
+|-----------------------------------|-------------|
+| `itemforge3d.register(modname, name, def)` | Register a tool, node, or craftitem |
+| `itemforge3d.equip(player, def)` | Equip an item into its defined slot |
 | `itemforge3d.unequip(player, slot)` | Unequip an item from a slot |
+| `itemforge3d.get_equipped(player)` | Get all equipped items by slot |
+| `itemforge3d.list_equipped(player)` | Get a list of equipped items |
+| `itemforge3d.get_slot(player, slot)` | Get the definition for a specific slot |
+| `itemforge3d.get_stats(player)` | Get aggregated stats for a player |
 
+---
 
 ## Full Examples
 
@@ -151,8 +160,7 @@ itemforge3d.register("mymod", "sword", {
             rotation = {x=0, y=90, z=0}
         }
     },
-    stats = { damage = 5 },
-    auto_wield = true
+    stats = { damage = 5 }
 })
 ```
 
@@ -221,8 +229,7 @@ itemforge3d.register("mymod", "lantern", {
                 })
             end
         end
-    },
-    auto_wield = true
+    }
 })
 ```
 
@@ -242,6 +249,7 @@ itemforge3d.register("mymod", "iron_helmet", {
     }
 })
 ```
+
 ---
 
 ### 5. Boots with Speed Bonus
@@ -255,8 +263,7 @@ itemforge3d.register("mymod", "swift_boots", {
     attach_model = {
         properties = { mesh = "boots.glb", textures = {"swift_boots.png"} },
         attach = { bone = "Legs", position = {x=0,y=0,z=0} }
-    },
-    auto_wield = true
+    }
 })
 ```
 
@@ -273,8 +280,7 @@ itemforge3d.register("mymod", "sturdy_shield", {
     attach_model = {
         properties = { mesh = "shield.glb", textures = {"shield.png"} },
         attach = { bone = "Arm_Left", position = {x=0,y=5,z=0}, rotation = {x=0,y=0,z=0} }
-    },
-    auto_wield = true
+    }
 })
 ```
 
@@ -308,8 +314,7 @@ itemforge3d.register("mymod", "spring_leggings", {
     attach_model = {
         properties = { mesh = "leggings.glb", textures = {"spring_leggings.png"} },
         attach = { bone = "Legs", position = {x=0,y=0,z=0} }
-    },
-    auto_wield = true
+    }
 })
 ```
 
@@ -318,7 +323,7 @@ itemforge3d.register("mymod", "spring_leggings", {
 ## Summary
 
 - Use `itemforge3d.register(modname, name, def)` for **tools, nodes, or craftitems**.  
-- Add `slot` to place items in equipment slots (`helmet`, `boots`, `shield`, `chest`, `legs`, etc.).  
+- Add `slot` to place items in equipment slots (`helmet`, `boots`, `shield`, `chest`, `legs`).  
 - Add `attach_model` to show a **3D mesh** when equipped.  
 - Use `update` for **animations, effects, or dynamic behavior**.  
 - Recipes can be declared either with `recipe` (shaped shorthand) or `craft` (full passthrough).  
@@ -327,7 +332,4 @@ itemforge3d.register("mymod", "spring_leggings", {
 - Duplicate registrations log a warning.  
 - The registered item will be named `modname:name`.  
 - Optional callbacks `on_equip` and `on_unequip` let mods hook into lifecycle events.  
-- Helper functions (`equip`, `get_stats`, `refresh_stats`, `is_equipped`, `get_equipped_item`, `unequip`) make it easy to manage equipment programmatically.  
-- Items can opt‑in to **auto‑attach on wield** by setting `auto_wield = true`, but this is now handled externally (e.g. via a formspec mod).  
-
-
+- Helper functions (`equip`, `get_stats`, `list_equipped`, `get_slot`, `unequip`) make it easy to manage equipment programmatically.
