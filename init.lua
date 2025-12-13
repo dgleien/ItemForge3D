@@ -32,7 +32,6 @@ function IFORGE.register(modname, item_name, register_def)
     return true
 end
 
--- Attach entity with full ItemStack preservation
 function IFORGE.attach_entity(player, itemstack, opts)
     opts = opts or {}
     if not player or not itemstack or itemstack:is_empty() then return false end
@@ -118,7 +117,6 @@ function IFORGE.get_attached_items(player)
     return list
 end
 
--- Return full entries including ItemStack
 function IFORGE.get_attached_entries(player)
     local name = player:get_player_name()
     local entries = ENTITIES[name]
