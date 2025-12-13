@@ -7,12 +7,10 @@ itemforge3d.register(modname, name, def)
 ```
 
 - `modname`: The mod's namespace (e.g. `"mymod"`).  
-- `name`: The item’s unique name (e.g. `"sword"`).  
+- `name`: The item's unique name (e.g. `"sword"`).  
 - `def`: A table with item definition and optional 3D model info.  
 
 > The final registered item will be named as `modname:name`, for example: `"mymod:sword"`.
-
----
 
 ## Supported Item Types
 
@@ -30,11 +28,9 @@ You can register **three kinds of items**:
    - Misc items (food, gems, scrolls, lanterns).  
    - Registered with `core.register_craftitem`.
 
----
-
 ## Definition Fields
 
-Here’s what you can put inside `def`:
+Here's what you can put inside `def`:
 
 | Field             | Type    | Description |
 |-------------------|---------|-------------|
@@ -48,8 +44,6 @@ Here’s what you can put inside `def`:
 | `stats`           | table   | Arbitrary stats (armor, speed, jump, gravity, knockback, or custom) |
 | `on_equip`        | function| Called when item is equipped |
 | `on_unequip`      | function| Called when item is unequipped |
-
----
 
 ## attach_model Fields
 
@@ -89,7 +83,16 @@ update = function(ent, player)
 end
 ```
 
----
+## Equipment Slots
+
+Available equipment slots:
+- `helmet`
+- `chest`
+- `legs`
+- `boots`
+- `shield`
+
+Items without a slot are tracked as generic equipped items.
 
 ## Equipment Lifecycle
 
@@ -104,16 +107,12 @@ The API manages **equip/unequip** automatically:
 - `on_equip(player, ent, slot, def)` → called when an item is equipped.  
 - `on_unequip(player, slot, def)` → called when an item is unequipped.  
 
----
-
 ## Stats System
 
 - Stats from all equipped items are **aggregated** automatically.  
 - Use `itemforge3d.get_stats(player)` to retrieve aggregated stats.  
 
 > Stats are **not applied automatically** to gameplay — mods must use them (e.g. adjust physics, damage, etc.).
-
----
 
 ## API Reference
 
@@ -126,8 +125,6 @@ The API manages **equip/unequip** automatically:
 | `itemforge3d.list_equipped(player)` | Get a list of equipped items |
 | `itemforge3d.get_slot(player, slot)` | Get the definition for a specific slot |
 | `itemforge3d.get_stats(player)` | Get aggregated stats for a player |
-
----
 
 ## Full Examples
 
@@ -158,8 +155,6 @@ itemforge3d.register("mymod", "sword", {
 })
 ```
 
----
-
 ### 2. Node with 3D Model (full craft passthrough)
 ```lua
 itemforge3d.register("mymod", "magic_block", {
@@ -188,8 +183,6 @@ itemforge3d.register("mymod", "magic_block", {
     }
 })
 ```
-
----
 
 ### 3. Craftitem with Dynamic Effect
 ```lua
@@ -227,8 +220,6 @@ itemforge3d.register("mymod", "lantern", {
 })
 ```
 
----
-
 ### 4. Helmet with Armor Stat
 ```lua
 itemforge3d.register("mymod", "iron_helmet", {
@@ -243,8 +234,6 @@ itemforge3d.register("mymod", "iron_helmet", {
     }
 })
 ```
-
----
 
 ### 5. Boots with Speed Bonus
 ```lua
@@ -261,8 +250,6 @@ itemforge3d.register("mymod", "swift_boots", {
 })
 ```
 
----
-
 ### 6. Shield with Knockback Resistance
 ```lua
 itemforge3d.register("mymod", "sturdy_shield", {
@@ -277,8 +264,6 @@ itemforge3d.register("mymod", "sturdy_shield", {
     }
 })
 ```
-
----
 
 ### 7. Chestplate with Defense Bonus
 ```lua
@@ -295,8 +280,6 @@ itemforge3d.register("mymod", "iron_chestplate", {
 })
 ```
 
----
-
 ### 8. Legs with Jump Boost
 ```lua
 itemforge3d.register("mymod", "spring_leggings", {
@@ -311,8 +294,6 @@ itemforge3d.register("mymod", "spring_leggings", {
     }
 })
 ```
-
----
 
 ## Summary
 
