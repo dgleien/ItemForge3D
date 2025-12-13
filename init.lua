@@ -6,6 +6,10 @@ local ITEM_ID_COUNTER = 0
 local EQUIP_CALLBACKS = {}
 local UNEQUIP_CALLBACKS = {}
 
+
+local IFORGE = {}
+IFORGE.slots = { "shield", "helmet", "chest", "legs", "boots" }
+
 function IFORGE.register_on_equip(func)
     table.insert(EQUIP_CALLBACKS, func)
 end
@@ -15,8 +19,8 @@ function IFORGE.register_on_unequip(func)
 end
 
 
-local IFORGE = {}
-IFORGE.slots = { "shield", "helmet", "chest", "legs", "boots" }
+
+
 
 local function is_valid_slot(slot)
     for _, s in ipairs(IFORGE.slots) do
@@ -339,3 +343,108 @@ core.register_chatcommand("unequip", {
 })
 
 itemforge3d = IFORGE
+
+-- Add mod storage
+local storage = core.get_mod_storage()
+
+-- Helper function to serialize only slot-specific equipped items
+local function serialize_slot_items(equipped_data)
+    local serialized = {}
+    
+    -- Only save items in specific slots
+    local slots = {"helmet", "chest", "legs", "boots", "shield"}
+    for _, slot in ipairs(slots) do
+        local item_data = equipped_data[slot]
+        if item_data and type(item_data) == "table" and item_data.def then
+            serialized[slot] = {
+                item_name = item_data.def.name,
+                stack = item_data.stack and item_data.stack:to_string() or nil
+            }
+        end
+    end
+    
+    return serialized
+end
+
+-- Helper function to deserialize slot-specific items (without adding to inventory)
+local function deserialize_slot_items(player, serialized_data)
+    if not serialized_data then return end
+    
+    -- Restore items in each slot directly
+    for slot, item_data in pairs(serialized_data) do
+        if item_data.item_name then
+            -- Create item stack and equip directly without taking from inventory
+            local stack = ItemStack(item_data.stack) or ItemStack(item_data.item_name)
+            local itemname = stack:get_name()
+            local def = REGISTERED_ITEMS[itemname]
+            
+            if def and def.slot == slot then
+                -- Manually equip without using IFORGE.equip (which takes from inventory)
+                local pname = player:get_player_name()
+                ENTITIES[pname] = ENTITIES[pname] or {}
+                EQUIPED_ITEMS[pname] = EQUIPED_ITEMS[pname] or {}
+                
+                local ent = get_entity_from_pool()
+                if ent and def.attach_model and def.attach_model.properties then
+                    ent:set_properties(def.attach_model.properties)
+                end
+                
+                local a = def.attach_model and def.attach_model.attach or {}
+                ent:set_attach(player,
+                    a.bone or "Arm_Right",
+                    a.position or {x=0,y=0,z=0},
+                    a.rotation or {x=0,y=0,z=0},
+                    a.forced_visible or false
+                )
+                
+                ENTITIES[pname][slot] = ent
+                EQUIPED_ITEMS[pname][slot] = {
+                    def = def,
+                    stack = stack:peek_item()
+                }
+                
+                if def.on_equip then
+                    def.on_equip(player, stack)
+                end
+                for _, cb in ipairs(EQUIP_CALLBACKS) do
+                    cb(player, def, stack)
+                end
+            end
+        end
+    end
+end
+
+local function save_player_slot_items(player)
+    local pname = player:get_player_name()
+    if EQUIPED_ITEMS[pname] then
+        local serialized = serialize_slot_items(EQUIPED_ITEMS[pname])
+        storage:set_string("player_" .. pname .. "_slot_equipment", core.serialize(serialized))
+        
+    else
+        storage:set_string("player_" .. pname .. "_slot_equipment", "")
+    end
+end
+
+local function restore_player_slot_items(player)
+    local pname = player:get_player_name()
+    local saved_data = storage:get_string("player_" .. pname .. "_slot_equipment")
+    if saved_data and saved_data ~= "" then
+        local serialized = core.deserialize(saved_data)
+        if serialized then
+            deserialize_slot_items(player, serialized)
+        end
+        storage:set_string("player_" .. pname .. "_slot_equipment", "")
+    end
+end
+
+core.register_on_leaveplayer(function(player, timed_out)
+    save_player_slot_items(player)
+end)
+
+
+core.register_on_joinplayer(function(player)
+    core.after(1, function()
+        restore_player_slot_items(player)
+    end)
+end)
+
