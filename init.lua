@@ -1,45 +1,6 @@
 local REGISTERED_ITEMS = {}
 local ENTITIES = {}
-local ENTITY_POOL = {}
 local IFORGE = {}
-
-local function get_entity_from_pool()
-    local ent = table.remove(ENTITY_POOL, 1) -- FIFO reuse
-    if not ent then
-        ent = core.add_entity({x=0,y=0,z=0}, "itemforge3d:wield_entity")
-    end
-    return ent
-end
-
-local function cleanup_entity_pool()
-    local max_pool_size = IFORGE.max_pool_size or 10
-    if #ENTITY_POOL > max_pool_size then
-        local excess = #ENTITY_POOL - max_pool_size
-        for i = 1, excess do
-            local ent = table.remove(ENTITY_POOL)
-            if ent then ent:remove() end
-        end
-    end
-end
-
-local function return_entity_to_pool(entity)
-    if entity then
-        entity:set_properties({
-            visual = "mesh",
-            mesh = "itemforge3d_blank.glb",
-            textures = {"blank.png"},
-            visual_size = {x=1, y=1},
-            pointable = false,
-            physical = false,
-            collide_with_objects = false,
-        })
-        entity:set_detach()
-        entity:set_properties({visual_size = {x=0, y=0}})
-        entity:get_luaentity().item_meta = nil -- clear metadata
-        table.insert(ENTITY_POOL, entity)
-        cleanup_entity_pool()
-    end
-end
 
 function IFORGE.register(modname, item_name, register_def)
     local full_name = modname .. ":" .. item_name
@@ -79,14 +40,12 @@ function IFORGE.attach_entity(player, item_name)
     local def = REGISTERED_ITEMS[item_name]
     if not def then return false end
 
-    local ent = get_entity_from_pool()
+    local ent = core.add_entity({x=0,y=0,z=0}, "itemforge3d:wield_entity")
     if not ent or not player then return false end
 
-    ent:set_properties({
-        mesh = def.mesh or "itemforge3d_blank.glb",
-        textures = def.textures or {"blank.png"},
-        visual_size = def.visual_size or {x=1,y=1},
-    })
+    if def.properties then
+        ent:set_properties(def.properties)
+    end
 
     local attach = def.attach or {}
     ent:set_attach(player,
@@ -107,7 +66,7 @@ function IFORGE.detach_entity(player)
     if entry and entry.entity then
         local ent = entry.entity
         ent:set_detach()
-        return_entity_to_pool(ent)
+        ent:remove()
         ENTITIES[name] = nil
 
         local def = REGISTERED_ITEMS[entry.item_name]
