@@ -46,8 +46,7 @@ function IFORGE.attach_entity(player, itemstack, opts)
     if def.properties then
         ent:set_properties(def.properties)
     end
-
-    local attach = def.attach or {}
+    
     local attach = def.attach or {}
     ent:set_attach(player,
         attach.bone or "",
