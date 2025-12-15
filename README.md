@@ -1,5 +1,9 @@
 # ItemForge3D
 
+ItemForge3D provides a **safe, extensible API** for registering items and attaching wield entities to players. It supports lifecycle management, duplicate protection, and modder‑friendly callbacks.
+
+---
+
 ## Register Items
 ```lua
 itemforge3d.register(modname, name, def)
@@ -10,32 +14,29 @@ Registers a tool, node, or craftitem under the name `modname:name`.
 - `type`: `"tool"`, `"node"`, or `"craftitem"`
 - `description`: Inventory description
 - `inventory_image`: Icon texture
-- `recipe`: Shaped craft recipe
 - `craft`: Full craft definition (shapeless, cooking, fuel, etc.)
 - `properties`: Entity properties (mesh, textures, size)
 - `attach`: Attach position/rotation/bone
-- `wield_mode`: `"image"` (default), `"model"`, or `"none"`  
-  - `"image"` → attach a 2D inventory image entity to the player (default)  
-  - `"model"` → attach a 3D mesh entity to the player  
-  - `"none"` → no entity attached, item remains purely inventory‑based
 - `on_attach`: Callback when entity is attached
-- `on_detach`: Callback when entity is detached
 - `on_reload`: Callback when entity is reloaded after persistence
 
 ---
 
 ## Attach/Detach
-- `itemforge3d.attach_entity(player, itemstack, opts)` → attach an item’s wield entity to a player (image or model depending on `wield_mode`)
-- `itemforge3d.detach_entity(player, item_name)` → detach a specific item’s wield entity from a player
-- Multiple items can be attached per player
+- `itemforge3d.attach_entity(player, itemstack, opts)` → attach an item’s wield entity to a player  
+  - `opts.id` → optional identifier for duplicate protection and slot management
+- `itemforge3d.detach_entity(player, id)` → detach a specific item’s wield entity by identifier
+- `itemforge3d.detach_all(player)` → detach all wield entities from a player
+
+Multiple items can be attached per player, each tracked by `id`.
 
 ---
 
 ## Attachment Management
-- `itemforge3d.get_attached_items(player)` → returns a list of item names currently attached to the player
+- `itemforge3d.get_entities(player)` → returns a **safe copy** of all attached entries `{entity, item_name, stack, id}`
+- `itemforge3d.get_attached_items(player)` → returns a list of item names currently attached
 - `itemforge3d.get_attached_entries(player)` → returns detailed entries `{item_name, id, stack}`
 - `itemforge3d.reload_attached_items(player, item_list)` → re‑attaches items from a saved list
-- `itemforge3d.is_model_wield(item_name)` → returns `true` if the item is registered with `wield_mode = "model"`
 
 ---
 
@@ -45,27 +46,30 @@ Registers a tool, node, or craftitem under the name `modname:name`.
 |----------|-------------|
 | `itemforge3d.register(modname, name, def)` | Register a tool, node, or craftitem |
 | `itemforge3d.attach_entity(player, itemstack, opts)` | Attach an item’s wield entity to a player |
-| `itemforge3d.detach_entity(player, item_name)` | Detach a specific item’s wield entity from a player |
-| `itemforge3d.get_attached_items(player)` | Get a list of attached item names for a player |
+| `itemforge3d.detach_entity(player, id)` | Detach a specific item’s wield entity by identifier |
+| `itemforge3d.detach_all(player)` | Detach all wield entities from a player |
+| `itemforge3d.get_entities(player)` | Get a safe copy of attached entities |
+| `itemforge3d.get_attached_items(player)` | Get a list of attached item names |
 | `itemforge3d.get_attached_entries(player)` | Get detailed attached entries (name, id, stack) |
 | `itemforge3d.reload_attached_items(player, item_list)` | Reattach items from a saved list |
-| `itemforge3d.is_model_wield(item_name)` | Check if an item is set to use model wield |
 
 ---
 
 ## Examples
 
-### Tool with 3D Model
+### Tool with Custom Mesh
 ```lua
 itemforge3d.register("mymod", "sword", {
     type = "tool",
     description = "Forged Sword",
     inventory_image = "sword.png",
-    wield_mode = "model", -- opt-in for 3D model
-    recipe = {
-        {"default:steel_ingot", "default:steel_ingot", "default:steel_ingot"},
-        {"", "default:stick", ""},
-        {"", "default:stick", ""}
+    craft = {
+        output = "mymod:sword",
+        recipe = {
+            {"default:steel_ingot", "default:steel_ingot", "default:steel_ingot"},
+            {"", "default:stick", ""},
+            {"", "default:stick", ""}
+        }
     },
     properties = {
         mesh = "sword.glb",
@@ -80,22 +84,18 @@ itemforge3d.register("mymod", "sword", {
     on_attach = function(player, ent)
         core.chat_send_player(player:get_player_name(), "Sword attached!")
     end,
-    on_detach = function(player, ent)
-        core.chat_send_player(player:get_player_name(), "Sword detached!")
-    end,
     on_reload = function(player, ent, entry)
         core.chat_send_player(player:get_player_name(), "Sword reloaded!")
     end,
 })
 ```
 
-### Craftitem With Default Image Wield
+### Craftitem With Default Image
 ```lua
 itemforge3d.register("mymod", "pickaxe", {
     type = "tool",
     description = "Pickaxe",
     inventory_image = "pickaxe.png",
-    -- wield_mode defaults to "image", so no need to specify
 })
 ```
 
@@ -105,9 +105,11 @@ itemforge3d.register("mymod", "potion", {
     type = "craftitem",
     description = "Healing Potion",
     inventory_image = "potion.png",
-    wield_mode = "none", -- no entity attached
-    recipe = {
-        {"default:glass_bottle", "default:apple", "default:glass_bottle"},
+    craft = {
+        output = "mymod:potion",
+        recipe = {
+            {"default:glass_bottle", "default:apple", "default:glass_bottle"},
+        }
     },
 })
 ```
@@ -118,7 +120,7 @@ itemforge3d.register("mymod", "potion", {
 local saved = itemforge3d.get_attached_entries(player)
 
 -- Detach everything
-while itemforge3d.detach_entity(player) do end
+itemforge3d.detach_all(player)
 
 -- Later, reload them
 itemforge3d.reload_attached_items(player, saved)
@@ -127,12 +129,10 @@ itemforge3d.reload_attached_items(player, saved)
 ---
 
 ## Summary
-- Items wield with their **inventory image by default** (`wield_mode = "image"`).  
-- Opt‑in to 3D wielding with `wield_mode = "model"`.  
-- Opt‑out completely with `wield_mode = "none"`.  
+- Items wield with their **inventory image by default** unless you provide custom `properties` and `attach` fields.  
 - Attach visuals with `itemforge3d.attach_entity`.  
-- Detach visuals with `itemforge3d.detach_entity`.  
-- Multiple items can be attached per player.  
+- Detach visuals with `itemforge3d.detach_entity` or `detach_all`.  
+- Multiple items can be attached per player, tracked by `id`.  
 - Use `get_attached_items` or `get_attached_entries` plus `reload_attached_items` to snapshot and restore attachments.  
-- Optional callbacks (`on_attach`, `on_detach`, `on_reload`) let you hook into lifecycle events.  
-- Use `is_model_wield(item_name)` to check if a given item is configured for 3D wield.  
+- Optional callbacks (`on_attach`, `on_reload`) let you hook into lifecycle events.  
+- Use `craft` for registering recipes (shaped, shapeless, cooking, fuel, etc.).  

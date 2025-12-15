@@ -177,9 +177,9 @@ function IFORGE.reload_attached_items(player, item_list)
 
         local def = REGISTERED_ITEMS[entry.item_name]
         if def and def.on_reload then
-            local entries = IFORGE.get_entities(player)
-            local last = entries[#entries]
-            if last then def.on_reload(player, last.entity, last) end
+            local entries = ENTITIES[player:get_player_name()]
+            local attached = entries[#entries]
+            if attached then def.on_reload(player, attached.entity, attached) end
         end
     end
     return true
