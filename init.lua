@@ -21,18 +21,41 @@ function IFORGE.register(modname, item_name, register_def)
 
     if register_def.craft then
         core.register_craft(register_def.craft)
-    elseif register_def.recipe then
-        core.register_craft({
-            output = full_name,
-            recipe = register_def.recipe
-        })
     end
-
-    -- NEW: default wield_mode if not specified
-    register_def.wield_mode = register_def.wield_mode or "model"
 
     REGISTERED_ITEMS[full_name] = register_def
     return true
+end
+
+function IFORGE.get_registered_item(full_name)
+    local def = REGISTERED_ITEMS[full_name]
+    return def and table.copy(def) or nil
+end
+
+function IFORGE.get_registered_item_names()
+    local names = {}
+    for name, _ in pairs(REGISTERED_ITEMS) do
+        table.insert(names, name)
+    end
+    return table.copy(names)
+end
+
+function IFORGE.get_registered_items()
+    local items = {}
+    for name, def in pairs(REGISTERED_ITEMS) do
+        table.insert(items, { name = name, def = table.copy(def) })
+    end
+    return table.copy(items)
+end
+
+function IFORGE.get_registered_items_by_type(item_type)
+    local items = {}
+    for name, def in pairs(REGISTERED_ITEMS) do
+        if def.type == item_type then
+            table.insert(items, { name = name, def = table.copy(def) })
+        end
+    end
+    return table.copy(items)
 end
 
 function IFORGE.attach_entity(player, itemstack, opts)
@@ -41,24 +64,14 @@ function IFORGE.attach_entity(player, itemstack, opts)
 
     local item_name = itemstack:get_name()
     local def = REGISTERED_ITEMS[item_name]
-    if not def or def.wield_mode == "none" then return false end
+    if not def then return false end
 
-    local ent
-    if def.wield_mode == "model" then
-        ent = core.add_entity({x=0,y=0,z=0}, "itemforge3d:wield_entity")
-        if ent and def.properties then
-            ent:set_properties(def.properties)
-        end
-    elseif def.wield_mode == "image" then
-        ent = core.add_entity({x=0,y=0,z=0}, "itemforge3d:wield_image_entity")
-        if ent then
-            ent:set_properties({
-                textures = { item_name },
-                visual_size = {x=1, y=1},
-            })
-        end
-    end
+    local ent = core.add_entity(player:get_pos(), "itemforge3d:wield_entity")
     if not ent then return false end
+
+    if def.properties then
+        ent:set_properties(def.properties)
+    end
 
     local attach = def.attach or {}
     ent:set_attach(player,
@@ -70,41 +83,106 @@ function IFORGE.attach_entity(player, itemstack, opts)
 
     local name = player:get_player_name()
     ENTITIES[name] = ENTITIES[name] or {}
+
+    if opts.id then
+        for i, e in ipairs(ENTITIES[name]) do
+            if e.id == opts.id then
+                e.entity:remove()
+                table.remove(ENTITIES[name], i)
+                break
+            end
+        end
+    end
+
     table.insert(ENTITIES[name], {
         entity    = ent,
         item_name = item_name,
-        stack     = ItemStack(itemstack), -- full copy of stack with metadata
-        id        = opts.id,              -- optional slot/identifier
+        stack     = ItemStack(itemstack),
+        id        = opts.id,
     })
 
     if def.on_attach then def.on_attach(player, ent) end
     return true
 end
 
-function IFORGE.detach_entity(player, item_name)
+function IFORGE.detach_entity(player, id)
     local name = player:get_player_name()
-    local entries = ENTITIES[name]
-    if not entries then return false end
+    local list = ENTITIES[name]
+    if not list then return false end
 
-    for i, entry in ipairs(entries) do
-        if not item_name or entry.item_name == item_name then
-            local ent = entry.entity
-            ent:set_detach()
-            ent:remove()
-
-            local def = REGISTERED_ITEMS[entry.item_name]
-            if def and def.on_detach then
-                def.on_detach(player, ent)
-            end
-
-            table.remove(entries, i)
-            if #entries == 0 then
-                ENTITIES[name] = nil
-            end
+    for i, e in ipairs(list) do
+        if e.id == id then
+            e.entity:remove()
+            table.remove(list, i)
             return true
         end
     end
     return false
+end
+
+function IFORGE.detach_all(player)
+    local name = player:get_player_name()
+    local list = ENTITIES[name]
+    if not list then return false end
+
+    for _, e in ipairs(list) do
+        e.entity:remove()
+    end
+    ENTITIES[name] = {}
+    return true
+end
+
+function IFORGE.get_entities(player)
+    local list = ENTITIES[player:get_player_name()] or {}
+    local copy = {}
+    for i, e in ipairs(list) do
+        copy[i] = {
+            entity    = e.entity,
+            item_name = e.item_name,
+            stack     = ItemStack(e.stack),
+            id        = e.id,
+        }
+    end
+    return copy
+end
+
+function IFORGE.get_attached_items(player)
+    local entries = IFORGE.get_entities(player)
+    local list = {}
+    for _, entry in ipairs(entries) do
+        table.insert(list, entry.item_name)
+    end
+    return list
+end
+
+function IFORGE.get_attached_entries(player)
+    local entries = IFORGE.get_entities(player)
+    local out = {}
+    for i, entry in ipairs(entries) do
+        out[i] = {
+            item_name = entry.item_name,
+            id        = entry.id,
+            stack     = ItemStack(entry.stack),
+        }
+    end
+    return out
+end
+
+function IFORGE.reload_attached_items(player, item_list)
+    item_list = item_list or IFORGE.get_attached_entries(player)
+    if not item_list or #item_list == 0 then return false end
+
+    for _, entry in ipairs(item_list) do
+        IFORGE.attach_entity(player, entry.stack, { id = entry.id })
+
+        local def = REGISTERED_ITEMS[entry.item_name]
+        if def and def.on_reload then
+            local entries = IFORGE.get_entities(player)
+            local last = entries[#entries]
+            if last then def.on_reload(player, last.entity, last) end
+        end
+    end
+    return true
 end
 
 core.register_entity("itemforge3d:wield_entity", {
@@ -119,59 +197,5 @@ core.register_entity("itemforge3d:wield_entity", {
     },
 })
 
--- NEW: fallback entity for wield_mode="image"
-core.register_entity("itemforge3d:wield_image_entity", {
-    initial_properties = {
-        visual = "wielditem",
-        textures = {"blank.png"},
-        visual_size = {x=1, y=1},
-        pointable = false,
-        physical = false,
-        collide_with_objects = false,
-    },
-})
-
-function IFORGE.get_attached_items(player)
-    local name = player:get_player_name()
-    local entries = ENTITIES[name]
-    if not entries then return {} end
-
-    local list = {}
-    for _, entry in ipairs(entries) do
-        table.insert(list, entry.item_name)
-    end
-    return list
-end
-
-function IFORGE.get_attached_entries(player)
-    local name = player:get_player_name()
-    local entries = ENTITIES[name]
-    if not entries then return {} end
-
-    local out = {}
-    for i, entry in ipairs(entries) do
-        out[i] = {
-            item_name = entry.item_name,
-            id        = entry.id,
-            stack     = ItemStack(entry.stack), -- copy to avoid mutation
-        }
-    end
-    return out
-end
-
-function IFORGE.reload_attached_items(player, item_list)
-    if not item_list then return false end
-    for _, entry in ipairs(item_list) do
-        IFORGE.attach_entity(player, entry.stack, { id = entry.id })
-        local def = REGISTERED_ITEMS[entry.item_name]
-        if def and def.on_reload then
-            local name = player:get_player_name()
-            local entries = ENTITIES[name]
-            local last = entries and entries[#entries]
-            if last then def.on_reload(player, last.entity, last) end
-        end
-    end
-    return true
-end
 
 itemforge3d = IFORGE
