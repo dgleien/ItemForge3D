@@ -1,6 +1,7 @@
 # ItemForge3D
 
-ItemForge3D provides a **safe, extensible API** for attaching wield entities to players. It builds on Minetest’s built‑in item registry, storing only the **extra metadata** you need for visuals and lifecycle hooks.
+ItemForge3D provides a **safe, extensible API** for attaching wield entities to players.  
+It builds on Minetest’s built‑in item registry, storing only the **extra metadata** you need for visuals and lifecycle hooks.
 
 ---
 
@@ -17,16 +18,20 @@ Registers a tool, node, or craftitem under the name `modname:name`.
   - `attach`: Attach position/rotation/bone
   - `on_attach`: Callback when entity is attached
   - `on_reload`: Callback when entity is reloaded after persistence
+  - `on_detach`: Callback when entity is detached
+  - `wieldview`: `"mesh"` or `"wielditem"` visual mode
 - **Crafting**:
   - `craft`: Full craft definition (shapeless, cooking, fuel, etc.)
+
+> ⚠️ Duplicate protection: If you try to register the same item twice, ItemForge3D logs a warning and ignores the second attempt.
 
 ---
 
 ## Attach/Detach
 - `itemforge3d.attach_entity(player, itemstack, opts)` → attach an item’s wield entity to a player  
   - `opts.id` → optional identifier for duplicate protection and slot management
-- `itemforge3d.detach_entity(player, id)` → detach a specific item’s wield entity by identifier
-- `itemforge3d.detach_all(player)` → detach all wield entities from a player
+- `itemforge3d.detach_entity(player, id)` → detach a specific item’s wield entity by identifier (calls `on_detach` if defined)
+- `itemforge3d.detach_all(player)` → detach all wield entities from a player (calls `on_detach` for each)
 
 Multiple items can be attached per player, each tracked by `id`.
 
@@ -36,7 +41,7 @@ Multiple items can be attached per player, each tracked by `id`.
 - `itemforge3d.get_entities(player)` → returns a **safe copy** of all attached entries `{entity, item_name, stack, id}`
 - `itemforge3d.get_attached_items(player)` → returns a list of item names currently attached
 - `itemforge3d.get_attached_entries(player)` → returns detailed entries `{item_name, id, stack}`
-- `itemforge3d.reload_attached_items(player, item_list)` → re‑attaches items from a saved list
+- `itemforge3d.reload_attached_items(player, item_list)` → re‑attaches items from a saved list (calls `on_reload` if defined)
 - `itemforge3d.get_extras(item_name)` → returns the ItemForge3D‑specific metadata for a registered item
 
 ---
@@ -73,6 +78,7 @@ itemforge3d.register("mymod", "sword", {
             {"", "default:stick", ""}
         }
     },
+    wieldview = "mesh",
     properties = {
         mesh = "sword.glb",
         textures = {"sword_texture.png"},
@@ -88,6 +94,9 @@ itemforge3d.register("mymod", "sword", {
     end,
     on_reload = function(player, ent, entry)
         minetest.chat_send_player(player:get_player_name(), "Sword reloaded!")
+    end,
+    on_detach = function(player, ent, entry)
+        minetest.chat_send_player(player:get_player_name(), "Sword detached!")
     end,
 })
 ```
@@ -116,6 +125,24 @@ itemforge3d.register("mymod", "potion", {
 })
 ```
 
+### Wielditem Visual Example
+```lua
+itemforge3d.register("mymod", "apple", {
+    type = "craftitem",
+    description = "Shiny Apple",
+    inventory_image = "apple.png",
+    wieldview = "wielditem",  -- use Minetest's wielditem visual
+    attach = {
+        bone = "Arm_Right",
+        pos = {x=0, y=4, z=0},
+        rot = {x=0, y=0, z=0},
+    },
+    on_attach = function(player, ent)
+        minetest.chat_send_player(player:get_player_name(), "Apple attached with wielditem view!")
+    end,
+})
+```
+
 ### Saving and Reloading Attachments
 ```lua
 -- Save current attachments
@@ -132,9 +159,12 @@ itemforge3d.reload_attached_items(player, saved)
 
 ## Summary
 - **Base item info** (type, description, inventory image, etc.) comes from Minetest’s built‑in registry.  
-- **ItemForge3D stores only extras**: `properties`, `attach`, `on_attach`, `on_reload`.  
+- **ItemForge3D stores only extras**: `properties`, `attach`, `on_attach`, `on_reload`, `on_detach`, `wieldview`.  
 - Attach visuals with `itemforge3d.attach_entity`.  
 - Detach visuals with `itemforge3d.detach_entity` or `detach_all`.  
 - Multiple items can be attached per player, tracked by `id`.  
 - Use `get_attached_items` or `get_attached_entries` plus `reload_attached_items` to snapshot and restore attachments.  
 - Use `get_extras(item_name)` to inspect ItemForge3D‑specific metadata.  
+- Duplicate protection prevents silent overrides; conflicts can be inspected with helper utilities.  
+
+---
