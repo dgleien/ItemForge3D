@@ -40,6 +40,16 @@ function IFORGE.get_extras(full_name)
     return EXTRAS[full_name] and table.copy(EXTRAS[full_name]) or nil
 end
 
+-- Update extras safely (no redundant code)
+function IFORGE.update_extras(full_name, fields)
+    local extras = EXTRAS[full_name]
+    if not extras then return false end
+    for k, v in pairs(fields) do
+        extras[k] = table.copy(v)
+    end
+    return true
+end
+
 -- Accessor for all registered item names with extras
 function IFORGE.get_registered_item_names()
     local names = {}
@@ -183,18 +193,48 @@ function IFORGE.get_attached_entries(player)
     return out
 end
 
+-- Reapply attachment info to an existing entity
+function IFORGE.reapply_attachment(player, entry)
+    local extras = EXTRAS[entry.item_name]
+    if not extras then return false end
+
+    local attach = extras.attach or {}
+    entry.entity:set_attach(player,
+        attach.bone or "",
+        attach.pos or {x=0,y=0,z=0},
+        attach.rot or {x=0,y=0,z=0},
+        attach.force_visible or false
+    )
+    return true
+end
+
+-- Reload attached items (reapply if entity exists, otherwise reattach)
 function IFORGE.reload_attached_items(player, item_list)
     item_list = item_list or IFORGE.get_attached_entries(player)
     if not item_list or #item_list == 0 then return false end
 
     for _, entry in ipairs(item_list) do
-        IFORGE.attach_entity(player, entry.stack, { id = entry.id })
-
         local extras = EXTRAS[entry.item_name]
-        if extras and extras.on_reload then
-            local entries = ENTITIES[player:get_player_name()]
-            local attached = entries[#entries]
-            if attached then extras.on_reload(player, attached.entity, attached) end
+        local entries = ENTITIES[player:get_player_name()] or {}
+
+        -- find the existing attached entity by id
+        local attached
+        for _, e in ipairs(entries) do
+            if e.id == entry.id then
+                attached = e
+                break
+            end
+        end
+
+        if attached then
+            -- just reapply new attachment info
+            IFORGE.reapply_attachment(player, attached)
+            if extras and extras.on_reload then
+                extras.on_reload(player, attached.entity, attached)
+            end
+        else
+            -- fallback: attach fresh if missing
+            IFORGE.attach_entity(player, entry.stack, { id = entry.id })
         end
     end
     return true
