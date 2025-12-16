@@ -26,10 +26,11 @@ function IFORGE.register(modname, item_name, def)
 
     -- store only ItemForge3D-specific fields
     EXTRAS[full_name] = {
-        properties = def.properties,
+        properties = def.properties,  -- always used by attach_entity
         attach     = def.attach,
         on_attach  = def.on_attach,
         on_reload  = def.on_reload,
+        wieldview  = def.wieldview,
     }
 
     return true
@@ -40,7 +41,7 @@ function IFORGE.get_extras(full_name)
     return EXTRAS[full_name] and table.copy(EXTRAS[full_name]) or nil
 end
 
--- Update extras safely (no redundant code)
+-- Update extras safely
 function IFORGE.update_extras(full_name, fields)
     local extras = EXTRAS[full_name]
     if not extras then return false end
@@ -92,10 +93,21 @@ function IFORGE.attach_entity(player, itemstack, opts)
     local ent = core.add_entity(player:get_pos(), "itemforge3d:wield_entity")
     if not ent then return false end
 
+    -- always use properties from EXTRAS table
     if extras.properties then
         ent:set_properties(extras.properties)
     end
 
+    -- optional wieldview override
+    if extras.wieldview == "wielditem" then
+        ent:set_properties({
+            visual = "wielditem",
+            wield_item = item_name,
+            visual_size = {x=1, y=1},
+        })
+    end
+
+    -- apply attachment info
     local attach = extras.attach or {}
     ent:set_attach(player,
         attach.bone or "",
@@ -240,12 +252,24 @@ function IFORGE.reload_attached_items(player, item_list)
     return true
 end
 
--- Base wield entity
+-- Base mesh wield entity
 core.register_entity("itemforge3d:wield_entity", {
     initial_properties = {
         visual = "mesh",
         mesh = "blank.glb",
         textures = {"blank.png"},
+        visual_size = {x=1, y=1},
+        pointable = false,
+        physical = false,
+        collide_with_objects = false,
+    },
+})
+
+-- Base wielditem entity (empty placeholder)
+core.register_entity("itemforge3d:wield_entity_item", {
+    initial_properties = {
+        visual = "wielditem",
+        wield_item = "",  -- empty by default, will be overridden
         visual_size = {x=1, y=1},
         pointable = false,
         physical = false,
