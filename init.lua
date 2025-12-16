@@ -2,6 +2,17 @@ local EXTRAS = {}   -- only ItemForge3D-specific metadata
 local ENTITIES = {}
 local IFORGE = {}
 
+-- helper: shallow merge of two property tables
+local function merge_properties(base, override)
+    local props = table.copy(base)
+    if override then
+        for k, v in pairs(override) do
+            props[k] = v
+        end
+    end
+    return props
+end
+
 -- Register items with Minetest, store only extras
 function IFORGE.register(modname, item_name, def)
     local full_name = modname .. ":" .. item_name
@@ -81,7 +92,6 @@ function IFORGE.get_registered_items_by_type(item_type)
     return table.copy(items)
 end
 
--- Attach entity
 function IFORGE.attach_entity(player, itemstack, opts)
     opts = opts or {}
     if not player or not itemstack or itemstack:is_empty() then return false end
@@ -90,22 +100,29 @@ function IFORGE.attach_entity(player, itemstack, opts)
     local extras = EXTRAS[item_name]
     if not extras then return false end
 
-    local ent = core.add_entity(player:get_pos(), "itemforge3d:wield_entity")
+    -- choose which base entity to spawn
+    local ent
+    if extras.wieldview == "wielditem" then
+        ent = core.add_entity(player:get_pos(), "itemforge3d:wield_entity_item")
+    else
+        ent = core.add_entity(player:get_pos(), "itemforge3d:wield_entity")
+    end
     if not ent then return false end
 
-    -- always use properties from EXTRAS table
-    if extras.properties then
-        ent:set_properties(extras.properties)
+    -- get current properties from the entity
+    local current = ent:get_properties()
+
+    -- merge current with extras.properties
+    local props = merge_properties(current, extras.properties)
+
+    -- if wieldview is wielditem, enforce wielditem visual
+    if extras.wieldview == "wielditem" then
+        props.visual = "wielditem"
+        props.wield_item = item_name
     end
 
-    -- optional wieldview override
-    if extras.wieldview == "wielditem" then
-        ent:set_properties({
-            visual = "wielditem",
-            wield_item = item_name,
-            visual_size = {x=1, y=1},
-        })
-    end
+    -- apply merged properties
+    ent:set_properties(props)
 
     -- apply attachment info
     local attach = extras.attach or {}
@@ -139,6 +156,7 @@ function IFORGE.attach_entity(player, itemstack, opts)
     if extras.on_attach then extras.on_attach(player, ent) end
     return true
 end
+
 
 -- Detach helpers
 function IFORGE.detach_entity(player, id)
